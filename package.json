@@ -1,0 +1,22 @@
+{
+  "name": "miao",
+  "version": "0.0.1",
+  "description": "miaomiaomiao",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc -w",
+    "test": "npx nodemon ./out/index.js"
+  },
+  "author": "3096",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@discordjs/builders": "^0.11.0",
+    "@discordjs/rest": "^0.2.0-canary.0",
+    "discord-api-types": "^0.26.1",
+    "discord.js": "^13.5.0",
+    "dotenv": "^10.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.5.0"
+  }
+}
