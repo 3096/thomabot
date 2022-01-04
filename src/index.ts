@@ -1,5 +1,5 @@
 import { Client, Intents } from 'discord.js';
-import { token } from './config.json';  // TODO: use dotenv or something
+import config from './config';
 
 import commands from './commands/all-commands';
 
@@ -16,4 +16,4 @@ client.on('interactionCreate', async interaction => {
 	commandHandlers[interaction.commandName](interaction);
 });
 
-client.login(token);
+client.login(config.TOKEN);
