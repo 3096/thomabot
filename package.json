@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "build": "tsc -w",
-    "test": "npx nodemon ./out/index.js"
+    "test": "npx nodemon -w ./out ./out/index.js"
   },
   "author": "3096",
   "license": "UNLICENSED",

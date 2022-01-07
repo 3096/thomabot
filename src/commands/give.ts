@@ -1,8 +1,9 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { CommandInteraction, MessageEmbed, TextChannel } from "discord.js";
+import { Client, CommandInteraction, MessageEmbed, TextChannel } from "discord.js";
 import { Command } from "../command";
-import { writeData } from "../database";
+import { readData, writeData } from "../database";
 import config from "../config";
+import { mentionUser, useEmoji } from "../utils";
 
 const command_info = {
     name: "give",
@@ -50,45 +51,94 @@ const commandBuilder = () => new SlashCommandBuilder()
 
 
 interface GiveawayData {
-    ends: Date,
+    ends: number,
     quatity: number,
     prize: string,
+    channelId: string,
     messageId: string,
+    hostMemberId: string,
+    reactionEmojiId: string,
+    winnerIds?: string[],
 }
 
-const execute = async (interaction: CommandInteraction) => {
+interface GiveawayDatabase {
+    ongoingGiveaways: GiveawayData[],
+    endedGiveaways: GiveawayData[],
+    excludeList: string[],
+}
+
+const database: GiveawayDatabase = readData(command_info.name);
+
+
+function scheduleGiveaway(client: Client, data: GiveawayData) {
+    setTimeout(() => concludeGiveaway(client, data), data.ends - Date.now());
+}
+
+function newGiveaway(client: Client, data: GiveawayData) {
+    database.ongoingGiveaways.push(data);
+    writeData(command_info.name, database);
+    scheduleGiveaway(client, data);
+}
+
+function endGiveaway(data: GiveawayData) {
+    database.endedGiveaways.push(data);
+    const idx = database.ongoingGiveaways.findIndex(x => (x.messageId === data.messageId && x.channelId === data.channelId));
+    database.ongoingGiveaways.splice(idx, 1);
+    writeData(command_info.name, database);
+}
+
+
+const onReady = (client: Client) => {
+    for (const data of database.ongoingGiveaways) {
+        scheduleGiveaway(client, data);
+    }
+    console.log(`read: ${database.ongoingGiveaways.length} giveways`);
+};
+
+const executeCommand = async (interaction: CommandInteraction) => {
     const client = interaction.client;
     switch (interaction.options.getSubcommand()) {
         case command_info.subcommands.create.name:
             const duration = interaction.options.getString(command_info.subcommands.create.options.duration.name, true);
+            const durationMs = 2 * 24 * 60 * 60 * 1000;  // TODO:
+
             const quantity = interaction.options.getInteger(command_info.subcommands.create.options.quantity.name, true);
+
             const prize = interaction.options.getString(command_info.subcommands.create.options.prize.name, true);
+
             const channelInput = interaction.options.getChannel(command_info.subcommands.create.options.channel.name);
+            if (channelInput?.type !== 'GUILD_TEXT') {
+                await interaction.reply(`${channelInput?.name} is not a supported channel`);
+                return;
+            }
+
             const channelId = channelInput?.id ? channelInput.id : config.GIVE_DEFAULT_CHANNEL;
             const channel = client.channels.cache.get(channelId) as TextChannel;
+
+            const hostMemberId = interaction.member!.user.id;
 
             // send giveaway msg
             const embed = new MessageEmbed()
                 .setTitle(prize)
                 .setColor('#DC143C')
-                .setDescription(`点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：2天后\n本次抽奖由<@${interaction.member?.user.id}>提供`)
+                .setDescription(`点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：${"2天"}后\n本次抽奖由${mentionUser(hostMemberId)}提供`)
             const giveaway_message = await channel.send({
-                content: "抽奖！<:hutao1:865504617819668510>", embeds: [embed]
+                content: `抽奖！${useEmoji("865504617819668510", "hutao1")}`, embeds: [embed]
             });
 
             await giveaway_message.react(config.GIVE_REACT_EMOTE)
 
             // save info
             const data: GiveawayData = {
-                ends: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), quatity: quantity, prize: prize, messageId: giveaway_message.id,
+                ends: Date.now() + durationMs,
+                quatity: quantity,
+                prize: prize,
+                channelId: channelId,
+                messageId: giveaway_message.id,
+                hostMemberId: hostMemberId,
+                reactionEmojiId: config.GIVE_REACT_EMOTE,
             };
-            writeData(command_info.name, [data]);
-
-            // schedule task
-            // TODO:
-
-            // update message?
-            // TODO:
+            newGiveaway(client, data);
 
             // confirm it worked
             await interaction.reply(`搞定 <:venti_rose:923598256792018994>: <#${channelId}>`);
@@ -100,10 +150,44 @@ const execute = async (interaction: CommandInteraction) => {
     }
 };
 
+async function concludeGiveaway(client: Client, data: GiveawayData) {
+    const channel = client.channels.cache.get(data.channelId) as TextChannel;
+    const message = await channel.messages.fetch(data.messageId);
+    const reactionUsers = await message.reactions.cache.get(data.reactionEmojiId)!.users.fetch();
+    const rafflePool = [];
+    const excludeSet = new Set(database.excludeList);
+    for (const userId of reactionUsers.keys()) {
+        if (userId === config.CLIENT_ID) continue;
+        if (excludeSet.has(userId)) continue;
+        rafflePool.push(userId);
+    }
+
+    data.winnerIds = [];
+    for (let i = 0; i < data.quatity; i++) {
+        if (!rafflePool.length) break
+        const winnerIdx = Math.floor(Math.random() * rafflePool.length);
+        data.winnerIds.push(rafflePool[winnerIdx]);
+        rafflePool.splice(winnerIdx, 1);
+    }
+
+    const embed = new MessageEmbed()
+        .setTitle(data.prize)
+        // .setColor('#DC143C')
+        .setDescription(`获奖者：\n${data.winnerIds.map(id => mentionUser(id)).join("\n")}\n本次抽奖由${mentionUser(data.hostMemberId)}提供`);
+    await message.edit({ content: `抽奖结束 ${useEmoji("883973897001762837", "paimon_lay_down")}`, embeds: [embed] });
+
+    await channel.send(`恭喜 ${data.winnerIds.map(id => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(data.hostMemberId)}领取奖品：${data.prize}`);
+
+    database.excludeList.push(...data.winnerIds)
+    endGiveaway(data);
+}
+
+
 const command: Command = {
     name: command_info.name,
-    handler: execute,
+    handler: executeCommand,
     commandBuilder: commandBuilder,
+    onReady: onReady
 }
 
 export default command;

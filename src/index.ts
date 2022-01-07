@@ -9,6 +9,9 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 
 client.once('ready', () => {
 	console.log('Ready!');
+	for (const command of commands) {
+		command.onReady(client);
+	}
 });
 
 client.on('interactionCreate', async interaction => {
