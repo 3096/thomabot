@@ -2,7 +2,7 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import config from './config';
 
-import commands from './commands/all-commands';
+import commands from './command';
 
 export default function deployCommands() {
     const rest = new REST({ version: '9' }).setToken(config.TOKEN);
@@ -22,3 +22,5 @@ export default function deployCommands() {
         }
     })();
 }
+
+deployCommands();

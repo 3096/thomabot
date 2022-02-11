@@ -1,7 +1,7 @@
 import { Client, Intents } from 'discord.js';
 import config from './config';
 
-import commands from './commands/all-commands';
+import commands from './command';
 
 const commandHandlers = Object.fromEntries(commands.map(c => [c.name, c.handler]));
 

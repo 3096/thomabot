@@ -6,6 +6,8 @@ interface Config {
     TOKEN: string,
     CLIENT_ID: string,
     GUILD_ID: string,
+    LOG_CHANNEL: string,
+    MOD_ROLE_ID: string,
 
     GIVE_DEFAULT_CHANNEL: string,
     GIVE_REACT_EMOTE: string,

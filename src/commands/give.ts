@@ -3,7 +3,7 @@ import { Client, CommandInteraction, MessageEmbed, TextChannel } from "discord.j
 import { Command } from "../command";
 import { readData, writeData } from "../database";
 import config from "../config";
-import { mentionUser, useEmoji } from "../utils";
+import { mentionChannel, mentionUser, useEmoji } from "../utils";
 
 const command_info = {
     name: "give",
@@ -106,13 +106,17 @@ const executeCommand = async (interaction: CommandInteraction) => {
 
             const prize = interaction.options.getString(command_info.subcommands.create.options.prize.name, true);
 
+            let channelId: string;
             const channelInput = interaction.options.getChannel(command_info.subcommands.create.options.channel.name);
-            if (channelInput?.type !== 'GUILD_TEXT') {
-                await interaction.reply(`${channelInput?.name} is not a supported channel`);
-                return;
+            if (channelInput) {
+                if (channelInput.type !== 'GUILD_TEXT') {
+                    await interaction.reply(`${channelInput?.name} is not a supported channel`);
+                    return;
+                }
+                channelId = channelInput.id;
+            } else {
+                channelId = config.GIVE_DEFAULT_CHANNEL;
             }
-
-            const channelId = channelInput?.id ? channelInput.id : config.GIVE_DEFAULT_CHANNEL;
             const channel = client.channels.cache.get(channelId) as TextChannel;
 
             const hostMemberId = interaction.member!.user.id;
@@ -141,7 +145,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
             newGiveaway(client, data);
 
             // confirm it worked
-            await interaction.reply(`搞定 <:venti_rose:923598256792018994>: <#${channelId}>`);
+            await interaction.reply(`搞定 <:venti_rose:923598256792018994>: ${mentionChannel(channelId)}`);
 
             break;
 
