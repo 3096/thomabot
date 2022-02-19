@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "housekeeper of the house",
   "main": "index.ts",
+  "type": "module",
   "scripts": {
     "build": "tsc -w",
     "test": "nodemon -w ./out --experimental-specifier-resolution=node -r source-map-support/register ./out/index.js",

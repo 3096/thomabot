@@ -6,7 +6,7 @@ import { isMod, logError, mentionChannel, preformat } from "../utils";
 
 const command_info = {
     name: "tell",
-    description: "say something",
+    description: "save and repeat messages",
     subcommands: {
         send: {
             name: "send",
