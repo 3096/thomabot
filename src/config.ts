@@ -8,6 +8,7 @@ interface Config {
     GUILD_ID: string,
     LOG_CHANNEL: string,
     MOD_ROLE_ID: string,
+    ADMIN_ID: string,
 
     GIVE_DEFAULT_CHANNEL: string,
     GIVE_REACT_EMOTE: string,

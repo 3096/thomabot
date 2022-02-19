@@ -1,9 +1,9 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { Client, CommandInteraction, MessageEmbed, TextChannel } from "discord.js";
+import { Client, CommandInteraction, GuildMember, MessageEmbed, TextChannel } from "discord.js";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
 import config from "../config";
-import { mentionChannel, mentionUser, useEmoji } from "../utils";
+import { durationToMs, formatTime, mentionChannel, mentionUser, parseDuration, useEmoji } from "../utils";
 
 const command_info = {
     name: "give",
@@ -13,10 +13,11 @@ const command_info = {
             name: "create",
             description: "Host a new giveaway",
             options: {
-                duration: { name: "duration", description: "How long does the giveaway last" },
+                duration: { name: "duration", description: "How long does the giveaway last (e.g. 1D, 1H, 1M, 1S, 1D2H3M4S)" },
                 quantity: { name: "winners", description: "How many winners" },
                 prize: { name: "prize", description: "What the prize is" },
                 channel: { name: "channel", description: "Which channel to host in" },
+                host: { name: "host", description: "Who is hosting the giveaway" },
             }
         },
     },
@@ -47,6 +48,10 @@ const commandBuilder = () => new SlashCommandBuilder()
             .setName(command_info.subcommands.create.options.channel.name)
             .setDescription(command_info.subcommands.create.options.channel.name)
         )
+        .addMentionableOption(option => option
+            .setName(command_info.subcommands.create.options.host.name)
+            .setDescription(command_info.subcommands.create.options.host.description)
+        )
     );
 
 
@@ -68,6 +73,8 @@ interface GiveawayDatabase {
 }
 
 const database: GiveawayDatabase = readData(command_info.name);
+
+const durationMsMax = 2 ** 31 - 1;
 
 
 function scheduleGiveaway(client: Client, data: GiveawayData) {
@@ -100,11 +107,44 @@ const executeCommand = async (interaction: CommandInteraction) => {
     switch (interaction.options.getSubcommand()) {
         case command_info.subcommands.create.name:
             const duration = interaction.options.getString(command_info.subcommands.create.options.duration.name, true);
-            const durationMs = 2 * 24 * 60 * 60 * 1000;  // TODO:
+            const durationMs = durationToMs(parseDuration(duration.toUpperCase()));
+            if (durationMs > durationMsMax) {
+                interaction.reply(`${duration} 超出了最大值（${Math.floor(durationMsMax / 1000)}秒），如有需要请联系神里家家主 ${mentionUser(config.ADMIN_ID)}`);
+                return;
+            }
+            if (durationMs === 0) {
+                interaction.reply(`duration ${duration} 无效，请检查输入。支持的格式为 D, H, M, S，例如：1D, 1H, 1M, 1S, 1D2H3M4S`);
+                return;
+            }
 
             const quantity = interaction.options.getInteger(command_info.subcommands.create.options.quantity.name, true);
+            if (quantity < 1) {
+                interaction.reply(`${quantity} 不是有效的数量，请检查输入。`);
+                return;
+            }
 
             const prize = interaction.options.getString(command_info.subcommands.create.options.prize.name, true);
+            if (prize.length < 1) {
+                interaction.reply(`请检查prize输入。`);
+                return;
+            }
+
+            let hostMemberId: string;
+            const hostInput = interaction.options.getMentionable(command_info.subcommands.create.options.host.name);
+            if (hostInput) {
+                if ("user" in hostInput) {
+                    hostMemberId = (hostInput as GuildMember).user.id;
+                    if (hostMemberId === config.CLIENT_ID) {
+                        interaction.reply(`I'll host it as long as you pay for it ${useEmoji("923598256792018994", "venti_rose")}`);
+                        return;
+                    }
+                } else {
+                    interaction.reply(`请检查host输入。`);
+                    return;
+                }
+            } else {
+                hostMemberId = interaction.member!.user.id
+            }
 
             let channelId: string;
             const channelInput = interaction.options.getChannel(command_info.subcommands.create.options.channel.name);
@@ -117,15 +157,15 @@ const executeCommand = async (interaction: CommandInteraction) => {
             } else {
                 channelId = config.GIVE_DEFAULT_CHANNEL;
             }
-            const channel = client.channels.cache.get(channelId) as TextChannel;
 
-            const hostMemberId = interaction.member!.user.id;
+            const channel = client.channels.cache.get(channelId) as TextChannel;
+            const ends = Date.now() + durationMs;
 
             // send giveaway msg
             const embed = new MessageEmbed()
                 .setTitle(prize)
                 .setColor('#DC143C')
-                .setDescription(`点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：${"2天"}后\n本次抽奖由${mentionUser(hostMemberId)}提供`)
+                .setDescription(`点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：${formatTime(ends, "Relative")}\n本次抽奖由${mentionUser(hostMemberId)}提供`);
             const giveaway_message = await channel.send({
                 content: `抽奖！${useEmoji("865504617819668510", "hutao1")}`, embeds: [embed]
             });
@@ -134,7 +174,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
 
             // save info
             const data: GiveawayData = {
-                ends: Date.now() + durationMs,
+                ends: ends,
                 quatity: quantity,
                 prize: prize,
                 channelId: channelId,
@@ -145,7 +185,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
             newGiveaway(client, data);
 
             // confirm it worked
-            await interaction.reply(`搞定 <:venti_rose:923598256792018994>: ${mentionChannel(channelId)}`);
+            await interaction.reply(`搞定 ${useEmoji("923598256792018994", "venti_rose")}: ${mentionChannel(channelId)}`);
 
             break;
 
