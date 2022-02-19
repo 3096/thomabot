@@ -7,7 +7,7 @@ interface Config {
     CLIENT_ID: string,
     GUILD_ID: string,
     LOG_CHANNEL: string,
-    MOD_ROLE_ID: string,
+    MOD_ROLE_IDS: string,
     ADMIN_ID: string,
 
     GIVE_DEFAULT_CHANNEL: string,

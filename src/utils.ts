@@ -1,4 +1,4 @@
-import { Client, TextChannel } from "discord.js";
+import { Client, GuildMember, TextChannel } from "discord.js";
 import config from "./config";
 
 export function logError(client: Client, error: Error) {
@@ -42,9 +42,19 @@ export function formatTime(time: number, format: TimeFormat | null) {
     return `<t:${time}:${timeFormats[format]}>`;
 }
 
+
+export function preformat(text: string, lang: string = "") {
+    return `\`\`\`${lang}\n${text}\n\`\`\``
+}
+
+
 export async function fetchMessage(client: Client, channelId: string, messageId: string) {
     const channel = client.channels.cache.get(channelId) as TextChannel;
     return await channel.messages.fetch(messageId);
+}
+
+export function isMod(member: GuildMember) {
+    return member.permissions.has("ADMINISTRATOR") || member.roles.cache.hasAny(...config.MOD_ROLE_IDS.split(","));
 }
 
 

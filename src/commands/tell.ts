@@ -1,8 +1,8 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { Client, CommandInteraction, TextChannel } from "discord.js";
+import { Client, CommandInteraction, GuildMember, TextChannel } from "discord.js";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
-import { logError, mentionChannel } from "../utils";
+import { isMod, logError, mentionChannel, preformat } from "../utils";
 
 const command_info = {
     name: "tell",
@@ -22,17 +22,13 @@ const command_info = {
             description: "add a message",
             options: {
                 name: { name: "name", description: "Name of the message" },
-                message: { name: "message", description: "What to say" },
+                message: { name: "message", description: "What to say (when not set, named message will be deleted)" },
             }
         },
-        // send: {
-        //     name: "send",
-        //     description: "Send a message",
-        //     options: {
-        //         message: { name: "message", description: "What to say" },
-        //         channel: { name: "channel", description: "Which channel to send in" },
-        //     }
-        // }
+        list: {
+            name: "list",
+            description: "list saved messages",
+        }
     },
 };
 
@@ -69,6 +65,11 @@ const commandBuilder = () => new SlashCommandBuilder()
             .setName(command_info.subcommands.save.options.message.name)
             .setDescription(command_info.subcommands.save.options.message.description)
         )
+    )
+
+    .addSubcommand(subcommand => subcommand
+        .setName(command_info.subcommands.list.name)
+        .setDescription(command_info.subcommands.list.description)
     );
 
 interface TellData {
@@ -128,6 +129,11 @@ const executeCommand = async (interaction: CommandInteraction) => {
         }
 
         case command_info.subcommands.save.name: {
+            if (!isMod(interaction.member as GuildMember)) {
+                await interaction.reply("你没有权限使用该指令。");
+                return;
+            }
+            
             let reply: string;
 
             const name = interaction.options.getString(command_info.subcommands.save.options.name.name, true);
@@ -156,6 +162,11 @@ const executeCommand = async (interaction: CommandInteraction) => {
                 interaction.reply(`failed to save ${name}: ${error}`);
             });
 
+            break;
+        }
+
+        case command_info.subcommands.list.name: {
+            await interaction.reply(preformat(Object.keys(database).join("\n")));
             break;
         }
 
