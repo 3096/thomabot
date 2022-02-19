@@ -154,6 +154,14 @@ const executeCommand = async (interaction: CommandInteraction) => {
     }
 };
 
+function getConcludeGiveawayMessage(prize: string, hostMemberId: string, winnerIds: string[]) {
+    const embed = new MessageEmbed()
+        .setTitle(prize)
+        // .setColor('#DC143C')
+        .setDescription(`获奖者：\n${winnerIds.map(id => mentionUser(id)).join("\n")}\n本次抽奖由${mentionUser(hostMemberId)}提供`);
+    return { content: `抽奖结束 ${useEmoji("883973897001762837", "paimon_lay_down")}`, embeds: [embed] };
+}
+
 async function concludeGiveaway(client: Client, data: GiveawayData) {
     const channel = client.channels.cache.get(data.channelId) as TextChannel;
     const message = await channel.messages.fetch(data.messageId);
@@ -174,16 +182,64 @@ async function concludeGiveaway(client: Client, data: GiveawayData) {
         rafflePool.splice(winnerIdx, 1);
     }
 
-    const embed = new MessageEmbed()
-        .setTitle(data.prize)
-        // .setColor('#DC143C')
-        .setDescription(`获奖者：\n${data.winnerIds.map(id => mentionUser(id)).join("\n")}\n本次抽奖由${mentionUser(data.hostMemberId)}提供`);
-    await message.edit({ content: `抽奖结束 ${useEmoji("883973897001762837", "paimon_lay_down")}`, embeds: [embed] });
+
+    await message.edit(getConcludeGiveawayMessage(data.prize, data.hostMemberId, data.winnerIds));
 
     await channel.send(`恭喜 ${data.winnerIds.map(id => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(data.hostMemberId)}领取奖品：${data.prize}`);
 
     database.excludeList.push(...data.winnerIds)
     endGiveaway(data);
+}
+
+async function rerollGiveaway(client: Client, messageId: string, rerollExplaination: string,
+    usersToBeReplaced: string[], usersToBeReinstated: string[]) {
+    let data: GiveawayData;
+    let i = database.endedGiveaways.length - 1;
+    while (true) {
+        if (i < 0) {
+            throw Error("giveaway not found");
+        }
+
+        if (database.endedGiveaways[i].messageId === messageId) {
+            data = database.endedGiveaways[i];
+            break;
+        }
+        i--;
+    }
+
+    if (!data.winnerIds) throw Error("giveaway not concluded");
+
+    database.excludeList = database.excludeList.filter(x => !usersToBeReinstated.includes(x));
+
+    const channel = client.channels.cache.get(data.channelId) as TextChannel;
+    const message = await channel.messages.fetch(data.messageId);
+    const reactionUsers = await message.reactions.cache.get(data.reactionEmojiId)!.users.fetch();
+    const rafflePool = [];
+    const excludeSet = new Set(database.excludeList);
+    data.winnerIds.forEach(x => excludeSet.add(x));
+
+    for (const userId of reactionUsers.keys()) {
+        if (userId === config.CLIENT_ID) continue;
+        if (excludeSet.has(userId)) continue;
+
+        rafflePool.push(userId);
+    }
+
+    let rerollWinners = [];
+    for (const replacingUser of usersToBeReplaced) {
+        if (!rafflePool.length) break;
+        const winnerIdx = Math.floor(Math.random() * rafflePool.length);
+        rerollWinners.push(rafflePool[winnerIdx]);
+        data.winnerIds[data.winnerIds.indexOf(replacingUser)] = rafflePool[winnerIdx];
+        rafflePool.splice(winnerIdx, 1);
+    }
+
+    await message.edit(getConcludeGiveawayMessage(data.prize, data.hostMemberId, data.winnerIds));
+
+    await channel.send(`${rerollExplaination}\n恭喜 ${rerollWinners.map(id => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(data.hostMemberId)}领取奖品：${data.prize}`);
+
+    database.excludeList.push(...rerollWinners);
+    writeData(command_info.name, database);
 }
 
 
