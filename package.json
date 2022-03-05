@@ -17,7 +17,8 @@
     "discord-api-types": "^0.26.1",
     "discord.js": "^13.5.0",
     "dotenv": "^10.0.0",
-    "source-map-support": "^0.5.21"
+    "source-map-support": "^0.5.21",
+    "yaml": "^1.10.2"
   },
   "devDependencies": {
     "eslint": "^8.5.0",

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { Client, CommandInteraction, GuildMember, TextChannel } from "discord.js";
+import { Client, CommandInteraction, GuildMember, MessageEmbed, MessageOptions, TextChannel } from "discord.js";
+import YAML from "yaml";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
 import { isMod, logError, mentionChannel, preformat } from "../utils";
@@ -73,9 +74,8 @@ const commandBuilder = () => new SlashCommandBuilder()
     );
 
 interface TellData {
-    [name: string]: {
-        message: string,
-    },
+    tell: { [key: string]: MessageOptions },
+    randomTellLists: { [key: string]: MessageOptions[] },
 }
 let database: TellData;
 
@@ -84,7 +84,7 @@ const onReady = (client: Client) => {
         database = readData(command_info.name) as TellData;
     } catch (error) {
         if ((error as any).code === "ENOENT") {
-            database = {};
+            database = { tell: {}, randomTellLists: {} };
             writeData(command_info.name, { database })
                 .catch(error => logError(client, error));
         } else {
@@ -106,11 +106,14 @@ const executeCommand = async (interaction: CommandInteraction) => {
             }
 
             const name = interaction.options.getString(command_info.subcommands.send.options.name.name, true);
-            if (!(name in database)) {
+            if (!(name in database.tell)) {
                 await interaction.reply(`${name} is not a saved message.`);
                 return;
             }
-            message += database[name].message;
+            const messageToSend = { ...database.tell[name] };
+            if (messageToSend.content) {
+                messageToSend.content = message + messageToSend.content;
+            }
 
             const channelInput = interaction.options.getChannel(command_info.subcommands.send.options.channel.name);
             if (channelInput) {
@@ -118,11 +121,11 @@ const executeCommand = async (interaction: CommandInteraction) => {
                     await interaction.reply(`${channelInput?.name} is not a supported channel`);
                     return;
                 }
-                const sentMsg = await (client.channels.cache.get(channelInput.id) as TextChannel).send(message);
+                const sentMsg = await (client.channels.cache.get(channelInput.id) as TextChannel).send(messageToSend);
                 await interaction.reply(`Message sent to ${mentionChannel(sentMsg.channel.id)}`);
 
             } else {
-                await interaction.reply(message);
+                await interaction.reply(messageToSend);
             }
 
             break;
@@ -133,26 +136,26 @@ const executeCommand = async (interaction: CommandInteraction) => {
                 await interaction.reply("你没有权限使用该指令。");
                 return;
             }
-            
+
             let reply: string;
 
             const name = interaction.options.getString(command_info.subcommands.save.options.name.name, true);
             const message = interaction.options.getString(command_info.subcommands.save.options.message.name);
             if (message) {
-                if (name in database) {
+                if (name in database.tell) {
                     reply = `updated ${name}`;
                 } else {
                     reply = `created ${name}`;
                 }
 
-                database[name] = { message };
+                database.tell[name] = { ...database.tell[name], content: message };
             } else {
-                if (!(name in database)) {
+                if (!(name in database.tell)) {
                     await interaction.reply(`${name} is not a saved message.`);
                     return;
                 }
                 reply = `deleted ${name}`;
-                delete database[name];
+                delete database.tell[name];
             }
 
             writeData(command_info.name, database).then(() => {
@@ -166,7 +169,13 @@ const executeCommand = async (interaction: CommandInteraction) => {
         }
 
         case command_info.subcommands.list.name: {
-            await interaction.reply(preformat(Object.keys(database).join("\n")));
+            const embed = new MessageEmbed().setTitle("Saved messages");
+            for (const name in database.tell) {
+                const messageContent = database.tell[name].content;
+                console.log(YAML.stringify(messageContent));
+                embed.addField(name, messageContent ? messageContent : YAML.stringify(database.tell[name]));
+            }
+            await interaction.reply({ embeds: [embed] });
             break;
         }
 

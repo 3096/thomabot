@@ -12,12 +12,16 @@ export function mentionUser(id: string) {
     return `<@${id}>`;
 }
 
-export function useEmoji(id: string, name: string) {
-    return `<:${name}:${id}>`;
+export function useEmoji(id: string, name: string, animated = false) {
+    return `<${animated ? 'a' : ''}:${name}:${id}>`;
 }
 
 export function mentionChannel(id: string) {
     return `<#${id}>`;
+}
+
+export function getChannelUrl(channel: TextChannel) {
+    return `https://discordapp.com/channels/${channel.guild.id}/${channel.id}`;
 }
 
 export type TimeFormat = "FullDateShort" | "FullDateLong" | "DateShort" | "DateLong" | "TimeShort" | "TimeLong" | "Relative";
@@ -51,6 +55,16 @@ export function preformat(text: string, lang: string = "") {
 export async function fetchMessage(client: Client, channelId: string, messageId: string) {
     const channel = client.channels.cache.get(channelId) as TextChannel;
     return await channel.messages.fetch(messageId);
+}
+
+export async function fetchMeesageByLink(client: Client, link: string) {
+    const match = /https:\/\/discordapp.com\/channels\/(\d+)\/(\d+)\/(\d+)/.exec(link);
+    if (match === null) {
+        throw new Error("Invalid link");
+    }
+    const channelId = match[2];
+    const messageId = match[3];
+    return await fetchMessage(client, channelId, messageId);
 }
 
 export function isMod(member: GuildMember) {
