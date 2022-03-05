@@ -1,5 +1,6 @@
-import { Client, GuildMember, TextChannel } from "discord.js";
+import { Client, CommandInteraction, GuildMember, TextChannel } from "discord.js";
 import config from "./config";
+import { writeData } from "./database";
 
 export function logError(client: Client, error: Error) {
     const channel = client.channels.cache.get(config.LOG_CHANNEL) as TextChannel;
@@ -104,4 +105,13 @@ export function durationToMs(duration: Duration) {
         (duration.minutes ? duration.minutes * 1000 * 60 : 0) +
         (duration.seconds ? duration.seconds * 1000 : 0)
     );
+}
+
+export function updateDatabaseAndReply(interaction: CommandInteraction, name: string, database: any, message: string) {
+    writeData(name, database).then(() => {
+        interaction.reply(message);
+    }).catch(error => {
+        logError(interaction.client, error);
+        interaction.reply(`failed to save: ${error}`);
+    })
 }

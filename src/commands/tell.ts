@@ -1,9 +1,10 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
 import { Client, CommandInteraction, GuildMember, MessageEmbed, MessageOptions, TextChannel } from "discord.js";
+import config from "../config";
 import YAML from "yaml";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
-import { isMod, logError, mentionChannel, preformat } from "../utils";
+import { isMod, logError, mentionChannel, updateDatabaseAndReply } from "../utils";
 
 const command_info = {
     name: "tell",
@@ -29,7 +30,39 @@ const command_info = {
         list: {
             name: "list",
             description: "list saved messages",
-        }
+        },
+
+        sendRandom: {
+            name: "send-random",
+            description: "Send a random message from a list",
+            options: {
+                name: { name: "name", description: "Name of the list" },
+                // channel: { name: "channel", description: "Which channel to message in" },
+            },
+        },
+        saveRandom: {
+            name: "save-random",
+            description: "save a list of messages for random selection",
+            options: {
+                name: { name: "list-name", description: "Name of the list" },
+                messageIdx: { name: "message-index", description: "Index of the message" },
+                message: { name: "message-content", description: "What to say (when not set, indexed message will be deleted)" },
+            }
+        },
+        listRandom: {
+            name: "list-random",
+            description: "show saved random message lists",
+            options: {
+                name: { name: "list-name", description: "Name of the list" },
+            },
+        },
+        removeRandom: {
+            name: "remove-random",
+            description: "remove a random message list",
+            options: {
+                name: { name: "list-name", description: "Name of the list" },
+            },
+        },
     },
 };
 
@@ -71,7 +104,59 @@ const commandBuilder = () => new SlashCommandBuilder()
     .addSubcommand(subcommand => subcommand
         .setName(command_info.subcommands.list.name)
         .setDescription(command_info.subcommands.list.description)
+    )
+
+    .addSubcommand(subcommand => subcommand
+        .setName(command_info.subcommands.sendRandom.name)
+        .setDescription(command_info.subcommands.sendRandom.description)
+        .addStringOption(option => option
+            .setName(command_info.subcommands.sendRandom.options.name.name)
+            .setDescription(command_info.subcommands.sendRandom.options.name.description)
+            .setRequired(true)
+        )
+        // .addChannelOption(option => option
+        //     .setName(command_info.subcommands.sendRandom.options.channel.name)
+        //     .setDescription(command_info.subcommands.sendRandom.options.channel.description)
+        // )
+    )
+
+    .addSubcommand(subcommand => subcommand
+        .setName(command_info.subcommands.saveRandom.name)
+        .setDescription(command_info.subcommands.saveRandom.description)
+        .addStringOption(option => option
+            .setName(command_info.subcommands.saveRandom.options.name.name)
+            .setDescription(command_info.subcommands.saveRandom.options.name.description)
+            .setRequired(true)
+        )
+        .addNumberOption(option => option
+            .setName(command_info.subcommands.saveRandom.options.messageIdx.name)
+            .setDescription(command_info.subcommands.saveRandom.options.messageIdx.description)
+        )
+        .addStringOption(option => option
+            .setName(command_info.subcommands.saveRandom.options.message.name)
+            .setDescription(command_info.subcommands.saveRandom.options.message.description)
+        )
+    )
+
+    .addSubcommand(subcommand => subcommand
+        .setName(command_info.subcommands.listRandom.name)
+        .setDescription(command_info.subcommands.listRandom.description)
+        .addStringOption(option => option
+            .setName(command_info.subcommands.listRandom.options.name.name)
+            .setDescription(command_info.subcommands.listRandom.options.name.description)
+        )
+    )
+
+    .addSubcommand(subcommand => subcommand
+        .setName(command_info.subcommands.removeRandom.name)
+        .setDescription(command_info.subcommands.removeRandom.description)
+        .addStringOption(option => option
+            .setName(command_info.subcommands.removeRandom.options.name.name)
+            .setDescription(command_info.subcommands.removeRandom.options.name.description)
+            .setRequired(true)
+        )
     );
+
 
 interface TellData {
     tell: { [key: string]: MessageOptions },
@@ -92,6 +177,17 @@ const onReady = (client: Client) => {
         }
     }
 };
+
+const canUseSave = (member: GuildMember) => isMod || config.TELL_SAVE_WHITE_LIST.split(",").includes(member.id);
+
+async function showRandomList(interaction: CommandInteraction, name: string) {
+    const embed = new MessageEmbed().setTitle(`Random List: ${name}`);
+    database.randomTellLists[name].forEach((message, idx) => {
+        const messageContent = message.content;
+        embed.addField(idx.toString(), messageContent ? messageContent : YAML.stringify(database.tell[name]));
+    });
+    await interaction.reply({ embeds: [embed] });
+}
 
 const executeCommand = async (interaction: CommandInteraction) => {
     const client = interaction.client;
@@ -132,7 +228,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
         }
 
         case command_info.subcommands.save.name: {
-            if (!isMod(interaction.member as GuildMember)) {
+            if (!canUseSave(interaction.member as GuildMember)) {
                 await interaction.reply("你没有权限使用该指令。");
                 return;
             }
@@ -158,13 +254,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
                 delete database.tell[name];
             }
 
-            writeData(command_info.name, database).then(() => {
-                interaction.reply(reply);
-            }).catch(error => {
-                logError(client, error);
-                interaction.reply(`failed to save ${name}: ${error}`);
-            });
-
+            updateDatabaseAndReply(interaction, command_info.name, database, reply);
             break;
         }
 
@@ -172,10 +262,124 @@ const executeCommand = async (interaction: CommandInteraction) => {
             const embed = new MessageEmbed().setTitle("Saved messages");
             for (const name in database.tell) {
                 const messageContent = database.tell[name].content;
-                console.log(YAML.stringify(messageContent));
                 embed.addField(name, messageContent ? messageContent : YAML.stringify(database.tell[name]));
             }
             await interaction.reply({ embeds: [embed] });
+            break;
+        }
+
+        case command_info.subcommands.sendRandom.name: {
+            const name = interaction.options.getString(command_info.subcommands.sendRandom.options.name.name, true);
+            if (!(name in database.randomTellLists)) {
+                await interaction.reply(`${name} is not a saved random message list.`);
+                return;
+            }
+            const messageToSend = database.randomTellLists[name][Math.floor(Math.random() * database.randomTellLists[name].length)];
+            // const channelInput = interaction.options.getChannel(command_info.subcommands.sendRandom.options.channel.name);
+            // if (channelInput) {
+            //     if (channelInput.type !== 'GUILD_TEXT') {
+            //         await interaction.reply(`${channelInput?.name} is not a supported channel`);
+            //         return;
+            //     }
+            //     const sentMsg = await (client.channels.cache.get(channelInput.id) as TextChannel).send(messageToSend);
+            //     await interaction.reply(`Message sent to ${mentionChannel(sentMsg.channel.id)}`);
+
+            // } else {
+            //     await interaction.reply(messageToSend);
+            // }
+            await interaction.reply(messageToSend);
+            break;
+        }
+
+        case command_info.subcommands.saveRandom.name: {
+            if (!canUseSave(interaction.member as GuildMember)) {
+                await interaction.reply("你没有权限使用该指令。");
+                return;
+            }
+
+            const name = interaction.options.getString(command_info.subcommands.saveRandom.options.name.name, true);
+            const message = interaction.options.getString(command_info.subcommands.saveRandom.options.message.name);
+            const messageIdx = interaction.options.getNumber(command_info.subcommands.saveRandom.options.messageIdx.name);
+
+            if (!(name in database.randomTellLists)) {
+                if (message) {
+                    database.randomTellLists[name] = [{ content: message }];
+                    updateDatabaseAndReply(interaction, command_info.name, database, `saved to \`${name}\`: [0] ${message}`);
+                } else {
+                    database.randomTellLists[name] = [];
+                    updateDatabaseAndReply(interaction, command_info.name, database, `created \`${name}\``);
+                }
+                return;
+            }
+
+            const messageList = database.randomTellLists[name];
+
+            if (messageIdx) {
+                if (messageIdx < 0 || messageIdx >= database.randomTellLists[name].length) {
+                    await interaction.reply(`${messageIdx} is not a valid index.`);
+                    showRandomList(interaction, name);
+                    return;
+                }
+
+                if (message) {
+                    messageList[messageIdx] = { ...messageList[messageIdx], content: message };
+                    updateDatabaseAndReply(interaction, command_info.name, database, `updated \`${name}\`: [${messageIdx}] ${message}`);
+                } else {
+                    const [deletedMessage] = messageList.splice(messageIdx, 1);
+                    updateDatabaseAndReply(interaction, command_info.name, database, `deleted \`${name}\`: [${messageIdx}] ${deletedMessage.content}`);
+                }
+                return;
+            }
+
+            if (message) {
+                messageList.push({ content: message });
+                updateDatabaseAndReply(interaction, command_info.name, database, `added \`${name}\`: [${messageList.length - 1}] ${message}`);
+                return;
+            }
+
+            showRandomList(interaction, name);
+            return;
+        }
+
+        case command_info.subcommands.listRandom.name: {
+            if (Object.keys(database.randomTellLists).length === 0) {
+                await interaction.reply("There are no saved random message lists.");
+                return;
+            }
+
+            const name = interaction.options.getString(command_info.subcommands.listRandom.options.name.name);
+            if (!name) {
+                const embed = new MessageEmbed().setTitle("Saved Random Lists")
+                    .setDescription(`Use ${command_info.subcommands.listRandom.options.name.name} option to see inside a list.`);
+                for (const name in database.randomTellLists) {
+                    embed.addField(name, `${database.randomTellLists[name].length} messages`);
+                }
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+            if (!(name in database.randomTellLists)) {
+                await interaction.reply(`${name} is not a saved random message list.`);
+                return;
+            }
+            showRandomList(interaction, name);
+            break;
+        }
+
+        case command_info.subcommands.removeRandom.name: {
+            if (!canUseSave(interaction.member as GuildMember)) {
+                await interaction.reply("你没有权限使用该指令。");
+                return;
+            }
+
+            const name = interaction.options.getString(command_info.subcommands.removeRandom.options.name.name, true);
+            if (!(name in database.randomTellLists)) {
+                await interaction.reply(`${name} is not a saved random message list.`);
+                return;
+            }
+
+            delete database.randomTellLists[name];
+
+            updateDatabaseAndReply(interaction, command_info.name, database, `deleted \`${name}\``);
             break;
         }
 

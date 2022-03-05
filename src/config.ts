@@ -12,6 +12,8 @@ interface Config {
 
     GIVE_DEFAULT_CHANNEL: string,
     GIVE_REACT_EMOTE: string,
+
+    TELL_SAVE_WHITE_LIST: string,
 }
 
 export default process.env as any as Config;  // eh, fuck it
