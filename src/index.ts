@@ -2,6 +2,7 @@ import { Client, Intents } from 'discord.js';
 import config from './config';
 
 import commands from './command';
+import { startDailyBackup } from './database';
 
 const commandHandlers = Object.fromEntries(commands.map(c => [c.name, c.handler]));
 
@@ -12,6 +13,8 @@ client.once('ready', () => {
 	for (const command of commands) {
 		command.onReady(client);
 	}
+
+	startDailyBackup(client);
 });
 
 client.on('interactionCreate', async interaction => {

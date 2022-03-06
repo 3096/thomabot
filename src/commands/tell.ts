@@ -274,6 +274,10 @@ const executeCommand = async (interaction: CommandInteraction) => {
                 await interaction.reply(`${name} is not a saved random message list.`);
                 return;
             }
+            if (database.randomTellLists[name].length === 0) {
+                await interaction.reply(`${name} is empty.`);
+                return;
+            }
             const messageToSend = database.randomTellLists[name][Math.floor(Math.random() * database.randomTellLists[name].length)];
             // const channelInput = interaction.options.getChannel(command_info.subcommands.sendRandom.options.channel.name);
             // if (channelInput) {
@@ -314,7 +318,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
 
             const messageList = database.randomTellLists[name];
 
-            if (messageIdx) {
+            if (messageIdx !== null) {
                 if (messageIdx < 0 || messageIdx >= database.randomTellLists[name].length) {
                     await interaction.reply(`${messageIdx} is not a valid index.`);
                     showRandomList(interaction, name);
