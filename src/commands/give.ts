@@ -1,9 +1,9 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { Client, CommandInteraction, GuildMember, MessageEmbed, TextChannel } from "discord.js";
+import { Client, Collection, CommandInteraction, DiscordAPIError, GuildMember, Message, MessageEmbed, TextChannel, User } from "discord.js";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
 import config from "../config";
-import { durationToMs, formatTime, mentionChannel, mentionUser, parseDuration, useEmoji } from "../utils";
+import { durationToMs, formatTime, logError, mentionChannel, mentionUser, parseDuration, useEmoji } from "../utils";
 
 const command_info = {
     name: "give",
@@ -203,9 +203,20 @@ function getConcludeGiveawayMessage(prize: string, hostMemberId: string, winnerI
 }
 
 async function concludeGiveaway(client: Client, data: GiveawayData) {
-    const channel = client.channels.cache.get(data.channelId) as TextChannel;
-    const message = await channel.messages.fetch(data.messageId);
-    const reactionUsers = await message.reactions.cache.get(data.reactionEmojiId)!.users.fetch();
+    let channel: TextChannel, message: Message, reactionUsers: Collection<string, User>;
+    try {
+        channel = client.channels.cache.get(data.channelId) as TextChannel;
+        message = await channel.messages.fetch(data.messageId);
+        reactionUsers = await message.reactions.cache.get(data.reactionEmojiId)!.users.fetch();
+    } catch (e) {
+        if (!(e instanceof DiscordAPIError) || (e as DiscordAPIError).httpStatus !== 404) {
+            throw e;
+        }
+        endGiveaway(data);
+        logError(client, e, `[give] giveaway ended with error`);
+        return;
+    }
+
     const rafflePool = [];
     const excludeSet = new Set(database.excludeList);
     for (const userId of reactionUsers.keys()) {
@@ -247,7 +258,9 @@ async function rerollGiveaway(client: Client, messageId: string, rerollExplainat
         i--;
     }
 
-    if (!data.winnerIds) throw Error("giveaway not concluded");
+    if (!data.winnerIds) {
+        data.winnerIds = [];
+    }
 
     database.excludeList = database.excludeList.filter(x => !usersToBeReinstated.includes(x));
 

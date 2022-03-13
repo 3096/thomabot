@@ -2,6 +2,7 @@ import { Client, Intents } from 'discord.js';
 import config from './config';
 
 import commands from './command';
+import { logError } from './utils';
 import { startDailyBackup } from './database';
 import setPresence from './routines/presence';
 import { setMemberCount } from './routines/stats';
@@ -23,7 +24,12 @@ client.once('ready', () => {
 
 client.on('interactionCreate', async interaction => {
 	if (!interaction.isCommand()) return;
-	commandHandlers[interaction.commandName](interaction);
+	try {
+		commandHandlers[interaction.commandName](interaction);
+	} catch (e) {
+		console.error(e);
+		logError(client, e as Error);
+	}
 	setPresence(client, true);
 });
 

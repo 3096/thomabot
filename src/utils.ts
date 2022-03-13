@@ -1,12 +1,18 @@
 import { Client, CommandInteraction, GuildMember, TextChannel } from "discord.js";
+import YAML from "yaml";
 import config from "./config";
 import { writeData } from "./database";
 
-export function logError(client: Client, error: Error) {
+export function logError(client: Client, error: Error, info: string = "") {
     const channel = client.channels.cache.get(config.LOG_CHANNEL) as TextChannel;
-    channel.send(error.name);
-    channel.send(error.message);
-    channel.send(error.stack!);
+    let message = info ? `**${info}**\n` : "";
+    message += `${error.stack}`;
+    channel.send({ content: message, files: [{ attachment: Buffer.from(YAML.stringify(error)), name: "error.yaml" }] });
+}
+
+export function logInfo(client: Client, message: string) {
+    const channel = client.channels.cache.get(config.LOG_CHANNEL) as TextChannel;
+    channel.send(message);
 }
 
 export function mentionUser(id: string) {
