@@ -28,7 +28,7 @@ export function mentionChannel(id: string) {
 }
 
 export function getChannelUrl(channel: TextChannel) {
-    return `https://discordapp.com/channels/${channel.guild.id}/${channel.id}`;
+    return `https://discord.com/channels/${channel.guild.id}/${channel.id}`;
 }
 
 export type TimeFormat = "FullDateShort" | "FullDateLong" | "DateShort" | "DateLong" | "TimeShort" | "TimeLong" | "Relative";
@@ -65,12 +65,12 @@ export async function fetchMessage(client: Client, channelId: string, messageId:
 }
 
 export async function fetchMeesageByLink(client: Client, link: string) {
-    const match = /https:\/\/discordapp.com\/channels\/(\d+)\/(\d+)\/(\d+)/.exec(link);
+    const match = /https:\/\/discord(app)?.com\/channels\/(\d+)\/(\d+)\/(\d+)/.exec(link);
     if (match === null) {
         throw new Error("Invalid link");
     }
-    const channelId = match[2];
-    const messageId = match[3];
+    const channelId = match[3];
+    const messageId = match[4];
     return await fetchMessage(client, channelId, messageId);
 }
 
