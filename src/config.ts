@@ -19,4 +19,4 @@ interface Config {
     STATS_MEMBER_COUNT_CHANNEL: string,
 }
 
-export default process.env as any as Config;  // eh, fuck it
+export default process.env as unknown as Config;  // eh, fuck it

@@ -1,6 +1,6 @@
 import { Client, TextChannel } from 'discord.js';
-import fs from 'fs';
-import path from 'path';
+import fs from "node:fs";
+import path from "node:path";
 import config from './config';
 import { logError } from './utils';
 
@@ -12,7 +12,7 @@ export function readData(name: string) {
     return JSON.parse(fs.readFileSync(getFilePath(name), { encoding: 'utf8' }));
 }
 
-export function writeData(name: string, data: any) {
+export function writeData(name: string, data: unknown) {
     return new Promise((resolve, reject) => {
         if (!fs.existsSync(dataDir)) {
             fs.mkdirSync(dataDir);

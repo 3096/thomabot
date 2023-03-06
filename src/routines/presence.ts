@@ -1,7 +1,7 @@
 import { Client } from "discord.js";
 
 let intervalSet = false;
-const setPresence = (client: Client, isSummoned: boolean = false) => {
+const setPresence = (client: Client, isSummoned = false) => {
     if (isSummoned) {
         client.user!.setPresence({ status: 'online' });
         return;
@@ -10,9 +10,9 @@ const setPresence = (client: Client, isSummoned: boolean = false) => {
     if (intervalSet) return;
     setInterval(() => {
         if (Math.random() > 0.5) {
-            client.user!.setPresence({ status: 'idle', activities: [{ type: 'PLAYING', name: '打理庭院...' }] });
+            client.user!.setPresence({ status: 'idle', activities: [{ name: '打理庭院...' }] });
         } else {
-            client.user!.setPresence({ status: 'idle', activities: [{ type: 'PLAYING', name: '煎茶...' }] });
+            client.user!.setPresence({ status: 'idle', activities: [{ name: '煎茶...' }] });
         }
     }, (Math.random() * 11 + 7) * 60 * 1000);
     intervalSet = true;

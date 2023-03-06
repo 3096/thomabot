@@ -12,16 +12,10 @@
   "author": "3096",
   "license": "UNLICENSED",
   "dependencies": {
-    "@discordjs/builders": "^0.11.0",
-    "@discordjs/rest": "^0.2.0-canary.0",
-    "discord-api-types": "^0.26.1",
-    "discord.js": "^13.5.0",
-    "dotenv": "^10.0.0",
+    "discord-api-types": "^0.37.35",
+    "discord.js": "^14.7.1",
+    "dotenv": "^16.0.3",
     "source-map-support": "^0.5.21",
     "yaml": "^1.10.2"
-  },
-  "devDependencies": {
-    "eslint": "^8.5.0",
-    "nodemon": "^2.0.15"
   }
 }

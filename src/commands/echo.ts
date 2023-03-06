@@ -1,8 +1,7 @@
-import { SlashCommandBuilder } from "@discordjs/builders";
-import { CommandInteraction, GuildMember, TextChannel } from "discord.js";
+import { CommandInteraction, GuildMember, TextChannel, SlashCommandBuilder, ChannelType } from "discord.js";
+import { ApplicationCommandPermissionType } from "discord-api-types/v10";
 import { Command, SpecialPermissionTarget } from "../command";
 import { isMod, mentionChannel } from "../utils";
-import { ApplicationCommandPermissionTypes } from "discord.js/typings/enums";
 import config from "../config";
 
 const command_info = {
@@ -35,16 +34,15 @@ const executeCommand = async (interaction: CommandInteraction) => {
         return;
     }
 
-    const client = interaction.client;
-    const message = interaction.options.getString(command_info.options.message.name, true);
+    const message = interaction.options.get(command_info.options.message.name, true).value as string;
 
-    const channelInput = interaction.options.getChannel(command_info.options.channel.name);
-    if (channelInput) {
-        if (channelInput.type !== 'GUILD_TEXT') {
-            await interaction.reply(`${channelInput?.name} is not a supported channel`);
+    const channelOption = interaction.options.get(command_info.options.channel.name);
+    if (channelOption) {
+        if (channelOption.channel!.type !== ChannelType.GuildText) {
+            await interaction.reply(`${channelOption?.name} is not a supported channel`);
             return;
         }
-        const sentMsg = await (client.channels.cache.get(channelInput.id) as TextChannel).send(message);
+        const sentMsg = await (channelOption.channel as TextChannel).send(message);
         await interaction.reply(`Message sent to ${mentionChannel(sentMsg.channel.id)}`);
 
     } else {
@@ -60,14 +58,14 @@ const command: Command = {
     permissions: [
         {
             target: 'GUILD_OWNER' as SpecialPermissionTarget,
-            type: ApplicationCommandPermissionTypes.USER, permission: true
+            type: ApplicationCommandPermissionType.User, permission: true
         },
         {
             target: 'ADMIN' as SpecialPermissionTarget,
-            type: ApplicationCommandPermissionTypes.USER, permission: true
+            type: ApplicationCommandPermissionType.User, permission: true
         },
         ...config.MOD_ROLE_IDS.split(',').map(id => ({
-            target: id, type: ApplicationCommandPermissionTypes.ROLE, permission: true
+            target: id, type: ApplicationCommandPermissionType.Role, permission: true
         })),
     ],
 }

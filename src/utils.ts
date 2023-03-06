@@ -1,13 +1,15 @@
-import { Client, CommandInteraction, GuildMember, TextChannel } from "discord.js";
+import { Client, CommandInteraction, GuildMember, PermissionFlagsBits, TextChannel } from "discord.js";
 import YAML from "yaml";
 import config from "./config";
 import { writeData } from "./database";
 
-export function logError(client: Client, error: Error, info: string = "") {
+export const EMBED_LIMIT = 25;
+
+export function logError(client: Client, error: Error, info = "") {
     const channel = client.channels.cache.get(config.LOG_CHANNEL) as TextChannel;
     let message = info ? `**${info}**\n` : "";
     message += `${error.stack}`;
-    channel.send({ content: message, files: [{ attachment: Buffer.from(YAML.stringify(error)), name: "error.yaml" }] });
+    channel.send({ content: message, files: [{ attachment: YAML.stringify(error), name: "error.yaml" }] });
 }
 
 export function logInfo(client: Client, message: string) {
@@ -54,7 +56,7 @@ export function formatTime(time: number, format: TimeFormat | null) {
 }
 
 
-export function preformat(text: string, lang: string = "") {
+export function preformat(text: string, lang = "") {
     return `\`\`\`${lang}\n${text}\n\`\`\``
 }
 
@@ -75,7 +77,7 @@ export async function fetchMeesageByLink(client: Client, link: string) {
 }
 
 export function isMod(member: GuildMember) {
-    return member.permissions.has("ADMINISTRATOR") || member.roles.cache.hasAny(...config.MOD_ROLE_IDS.split(","));
+    return member.permissions.has(PermissionFlagsBits.Administrator) || member.roles.cache.hasAny(...config.MOD_ROLE_IDS.split(","));
 }
 
 
@@ -113,7 +115,7 @@ export function durationToMs(duration: Duration) {
     );
 }
 
-export function updateDatabaseAndReply(interaction: CommandInteraction, name: string, database: any, message: string) {
+export function updateDatabaseAndReply(interaction: CommandInteraction, name: string, database: unknown, message: string) {
     writeData(name, database).then(() => {
         interaction.reply(message);
     }).catch(error => {

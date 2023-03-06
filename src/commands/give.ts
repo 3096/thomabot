@@ -1,5 +1,4 @@
-import { SlashCommandBuilder } from "@discordjs/builders";
-import { Client, Collection, CommandInteraction, DiscordAPIError, GuildMember, Message, MessageEmbed, TextChannel, User } from "discord.js";
+import { Client, Collection, CommandInteraction, DiscordAPIError, GuildMember, Message, TextChannel, User, SlashCommandBuilder, CommandInteractionOptionResolver, ChannelType, EmbedBuilder } from "discord.js";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
 import config from "../config";
@@ -104,9 +103,10 @@ const onReady = (client: Client) => {
 
 const executeCommand = async (interaction: CommandInteraction) => {
     const client = interaction.client;
-    switch (interaction.options.getSubcommand()) {
-        case command_info.subcommands.create.name:
-            const duration = interaction.options.getString(command_info.subcommands.create.options.duration.name, true);
+    const interactionOptions = interaction.options as CommandInteractionOptionResolver;
+    switch (interactionOptions.getSubcommand()) {
+        case command_info.subcommands.create.name: {
+            const duration = interactionOptions.getString(command_info.subcommands.create.options.duration.name, true);
             const durationMs = durationToMs(parseDuration(duration.toUpperCase()));
             if (durationMs > durationMsMax) {
                 interaction.reply(`${duration} 超出了最大值（${Math.floor(durationMsMax / 1000)}秒），如有需要请联系神里家家主 ${mentionUser(config.ADMIN_ID)}`);
@@ -117,20 +117,20 @@ const executeCommand = async (interaction: CommandInteraction) => {
                 return;
             }
 
-            const quantity = interaction.options.getInteger(command_info.subcommands.create.options.quantity.name, true);
+            const quantity = interactionOptions.getInteger(command_info.subcommands.create.options.quantity.name, true);
             if (quantity < 1) {
                 interaction.reply(`${quantity} 不是有效的数量，请检查输入。`);
                 return;
             }
 
-            const prize = interaction.options.getString(command_info.subcommands.create.options.prize.name, true);
+            const prize = interactionOptions.getString(command_info.subcommands.create.options.prize.name, true);
             if (prize.length < 1) {
                 interaction.reply(`请检查prize输入。`);
                 return;
             }
 
             let hostMemberId: string;
-            const hostInput = interaction.options.getMentionable(command_info.subcommands.create.options.host.name);
+            const hostInput = interactionOptions.getMentionable(command_info.subcommands.create.options.host.name);
             if (hostInput) {
                 if ("user" in hostInput) {
                     hostMemberId = (hostInput as GuildMember).user.id;
@@ -147,9 +147,9 @@ const executeCommand = async (interaction: CommandInteraction) => {
             }
 
             let channelId: string;
-            const channelInput = interaction.options.getChannel(command_info.subcommands.create.options.channel.name);
+            const channelInput = interactionOptions.getChannel(command_info.subcommands.create.options.channel.name);
             if (channelInput) {
-                if (channelInput.type !== 'GUILD_TEXT') {
+                if (channelInput.type !== ChannelType.GuildText) {
                     await interaction.reply(`${channelInput?.name} is not a supported channel`);
                     return;
                 }
@@ -162,7 +162,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
             const ends = Date.now() + durationMs;
 
             // send giveaway msg
-            const embed = new MessageEmbed()
+            const embed = new EmbedBuilder()
                 .setTitle(prize)
                 .setColor('#DC143C')
                 .setDescription(`点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：${formatTime(ends, "Relative")}\n本次抽奖由${mentionUser(hostMemberId)}提供`);
@@ -188,14 +188,14 @@ const executeCommand = async (interaction: CommandInteraction) => {
             await interaction.reply(`搞定 ${useEmoji("923598256792018994", "venti_rose")}: ${mentionChannel(channelId)}`);
 
             break;
-
+        }
         default:
-            throw Error("bad commannd");
+            throw Error("bad command");
     }
 };
 
 function getConcludeGiveawayMessage(prize: string, hostMemberId: string, winnerIds: string[]) {
-    const embed = new MessageEmbed()
+    const embed = new EmbedBuilder()
         .setTitle(prize)
         // .setColor('#DC143C')
         .setDescription(`获奖者：\n${winnerIds.map(id => mentionUser(id)).join("\n")}\n本次抽奖由${mentionUser(hostMemberId)}提供`);
@@ -209,7 +209,7 @@ async function concludeGiveaway(client: Client, data: GiveawayData) {
         message = await channel.messages.fetch(data.messageId);
         reactionUsers = await message.reactions.cache.get(data.reactionEmojiId)!.users.fetch();
     } catch (e) {
-        if (!(e instanceof DiscordAPIError) || (e as DiscordAPIError).httpStatus !== 404) {
+        if (!(e instanceof DiscordAPIError) || (e as DiscordAPIError).status !== 404) {
             throw e;
         }
         endGiveaway(data);
@@ -242,7 +242,7 @@ async function concludeGiveaway(client: Client, data: GiveawayData) {
     endGiveaway(data);
 }
 
-async function rerollGiveaway(client: Client, messageId: string, rerollExplaination: string,
+async function _rerollGiveaway(client: Client, messageId: string, rerollExplaination: string,
     usersToBeReplaced: string[], usersToBeReinstated: string[]) {
     let data: GiveawayData;
     let i = database.endedGiveaways.length - 1;
@@ -278,7 +278,7 @@ async function rerollGiveaway(client: Client, messageId: string, rerollExplainat
         rafflePool.push(userId);
     }
 
-    let rerollWinners = [];
+    const rerollWinners = [];
     for (const replacingUser of usersToBeReplaced) {
         if (!rafflePool.length) break;
         const winnerIdx = Math.floor(Math.random() * rafflePool.length);
