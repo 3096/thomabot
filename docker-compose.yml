@@ -1,0 +1,7 @@
+version: '3.9'
+services:
+  miaobot:
+    build: .
+    volumes:
+      - ./data:/app/data
+    restart: always
