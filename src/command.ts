@@ -1,4 +1,4 @@
-import { Client, CommandInteraction, ApplicationCommandPermissions, SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from "discord.js";
+import { Client, CommandInteraction, ApplicationCommandPermissions, SharedSlashCommand } from "discord.js";
 import { ApplicationCommandPermissionType } from "discord-api-types/v10";
 import config from "./config";
 
@@ -43,7 +43,7 @@ export function parseCommandPermission(client: Client, permission: CommandPermis
 export interface Command {
     name: string,
     handler: (interaction: CommandInteraction) => void,
-    commandBuilder: () => SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
+    commandBuilder: () => SharedSlashCommand,
     onReady: (client: Client) => void,
     permissions?: CommandPermission[],
 }

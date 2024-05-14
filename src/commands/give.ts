@@ -1,4 +1,17 @@
-import { Client, Collection, CommandInteraction, DiscordAPIError, GuildMember, Message, TextChannel, User, SlashCommandBuilder, CommandInteractionOptionResolver, ChannelType, EmbedBuilder } from "discord.js";
+import {
+    Client,
+    Collection,
+    CommandInteraction,
+    DiscordAPIError,
+    GuildMember,
+    Message,
+    TextChannel,
+    User,
+    SlashCommandBuilder,
+    CommandInteractionOptionResolver,
+    ChannelType,
+    EmbedBuilder,
+} from "discord.js";
 import { Command } from "../command";
 import { readData, writeData } from "../database";
 import config from "../config";
@@ -17,64 +30,70 @@ const command_info = {
                 prize: { name: "prize", description: "What the prize is" },
                 channel: { name: "channel", description: "Which channel to host in" },
                 host: { name: "host", description: "Who is hosting the giveaway" },
-            }
+            },
         },
     },
-}
+};
 
-const commandBuilder = () => new SlashCommandBuilder()
-    .setName(command_info.name).setDescription(command_info.description)
+const commandBuilder = () =>
+    new SlashCommandBuilder()
+        .setName(command_info.name)
+        .setDescription(command_info.description)
 
-    .addSubcommand(subcommand => subcommand
-        .setName(command_info.subcommands.create.name)
-        .setDescription(command_info.subcommands.create.description)
-        .addStringOption(option => option
-            .setName(command_info.subcommands.create.options.duration.name)
-            .setDescription(command_info.subcommands.create.options.duration.description)
-            .setRequired(true)
-        )
-        .addIntegerOption(option => option
-            .setName(command_info.subcommands.create.options.quantity.name)
-            .setDescription(command_info.subcommands.create.options.quantity.description)
-            .setRequired(true)
-        )
-        .addStringOption(option => option
-            .setName(command_info.subcommands.create.options.prize.name)
-            .setDescription(command_info.subcommands.create.options.prize.description)
-            .setRequired(true)
-        )
-        .addChannelOption(option => option
-            .setName(command_info.subcommands.create.options.channel.name)
-            .setDescription(command_info.subcommands.create.options.channel.name)
-        )
-        .addMentionableOption(option => option
-            .setName(command_info.subcommands.create.options.host.name)
-            .setDescription(command_info.subcommands.create.options.host.description)
-        )
-    );
-
+        .addSubcommand((subcommand) =>
+            subcommand
+                .setName(command_info.subcommands.create.name)
+                .setDescription(command_info.subcommands.create.description)
+                .addStringOption((option) =>
+                    option
+                        .setName(command_info.subcommands.create.options.duration.name)
+                        .setDescription(command_info.subcommands.create.options.duration.description)
+                        .setRequired(true)
+                )
+                .addIntegerOption((option) =>
+                    option
+                        .setName(command_info.subcommands.create.options.quantity.name)
+                        .setDescription(command_info.subcommands.create.options.quantity.description)
+                        .setRequired(true)
+                )
+                .addStringOption((option) =>
+                    option
+                        .setName(command_info.subcommands.create.options.prize.name)
+                        .setDescription(command_info.subcommands.create.options.prize.description)
+                        .setRequired(true)
+                )
+                .addChannelOption((option) =>
+                    option
+                        .setName(command_info.subcommands.create.options.channel.name)
+                        .setDescription(command_info.subcommands.create.options.channel.name)
+                )
+                .addMentionableOption((option) =>
+                    option
+                        .setName(command_info.subcommands.create.options.host.name)
+                        .setDescription(command_info.subcommands.create.options.host.description)
+                )
+        );
 
 interface GiveawayData {
-    ends: number,
-    quatity: number,
-    prize: string,
-    channelId: string,
-    messageId: string,
-    hostMemberId: string,
-    reactionEmojiId: string,
-    winnerIds?: string[],
+    ends: number;
+    quatity: number;
+    prize: string;
+    channelId: string;
+    messageId: string;
+    hostMemberId: string;
+    reactionEmojiId: string;
+    winnerIds?: string[];
 }
 
 interface GiveawayDatabase {
-    ongoingGiveaways: GiveawayData[],
-    endedGiveaways: GiveawayData[],
-    excludeList: string[],
+    ongoingGiveaways: GiveawayData[];
+    endedGiveaways: GiveawayData[];
+    excludeList: string[];
 }
 
 const database: GiveawayDatabase = readData(command_info.name);
 
 const durationMsMax = 2 ** 31 - 1;
-
 
 function scheduleGiveaway(client: Client, data: GiveawayData) {
     setTimeout(() => concludeGiveaway(client, data), data.ends - Date.now());
@@ -88,11 +107,12 @@ function newGiveaway(client: Client, data: GiveawayData) {
 
 function endGiveaway(data: GiveawayData) {
     database.endedGiveaways.push(data);
-    const idx = database.ongoingGiveaways.findIndex(x => (x.messageId === data.messageId && x.channelId === data.channelId));
+    const idx = database.ongoingGiveaways.findIndex(
+        (x) => x.messageId === data.messageId && x.channelId === data.channelId
+    );
     database.ongoingGiveaways.splice(idx, 1);
     writeData(command_info.name, database);
 }
-
 
 const onReady = (client: Client) => {
     for (const data of database.ongoingGiveaways) {
@@ -109,11 +129,17 @@ const executeCommand = async (interaction: CommandInteraction) => {
             const duration = interactionOptions.getString(command_info.subcommands.create.options.duration.name, true);
             const durationMs = durationToMs(parseDuration(duration.toUpperCase()));
             if (durationMs > durationMsMax) {
-                interaction.reply(`${duration} 超出了最大值（${Math.floor(durationMsMax / 1000)}秒），如有需要请联系神里家家主 ${mentionUser(config.ADMIN_ID)}`);
+                interaction.reply(
+                    `${duration} 超出了最大值（${Math.floor(durationMsMax / 1000)}秒），如有需要请联系神里家家主 ${mentionUser(
+                        config.ADMIN_ID
+                    )}`
+                );
                 return;
             }
             if (durationMs === 0) {
-                interaction.reply(`duration ${duration} 无效，请检查输入。支持的格式为 D, H, M, S，例如：1D, 1H, 1M, 1S, 1D2H3M4S`);
+                interaction.reply(
+                    `duration ${duration} 无效，请检查输入。支持的格式为 D, H, M, S，例如：1D, 1H, 1M, 1S, 1D2H3M4S`
+                );
                 return;
             }
 
@@ -143,7 +169,7 @@ const executeCommand = async (interaction: CommandInteraction) => {
                     return;
                 }
             } else {
-                hostMemberId = interaction.member!.user.id
+                hostMemberId = interaction.member!.user.id;
             }
 
             let channelId: string;
@@ -164,13 +190,19 @@ const executeCommand = async (interaction: CommandInteraction) => {
             // send giveaway msg
             const embed = new EmbedBuilder()
                 .setTitle(prize)
-                .setColor('#DC143C')
-                .setDescription(`点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：${formatTime(ends, "Relative")}\n本次抽奖由${mentionUser(hostMemberId)}提供`);
+                .setColor("#DC143C")
+                .setDescription(
+                    `点击下方表情参与！\n将随机选出${quantity}名赢家！\n截止：${formatTime(
+                        ends,
+                        "Relative"
+                    )}\n本次抽奖由${mentionUser(hostMemberId)}提供`
+                );
             const giveaway_message = await channel.send({
-                content: `抽奖！${useEmoji("865504617819668510", "hutao1")}`, embeds: [embed]
+                content: `抽奖！${useEmoji("865504617819668510", "hutao1")}`,
+                embeds: [embed],
             });
 
-            await giveaway_message.react(config.GIVE_REACT_EMOTE)
+            await giveaway_message.react(config.GIVE_REACT_EMOTE);
 
             // save info
             const data: GiveawayData = {
@@ -198,7 +230,9 @@ function getConcludeGiveawayMessage(prize: string, hostMemberId: string, winnerI
     const embed = new EmbedBuilder()
         .setTitle(prize)
         // .setColor('#DC143C')
-        .setDescription(`获奖者：\n${winnerIds.map(id => mentionUser(id)).join("\n")}\n本次抽奖由${mentionUser(hostMemberId)}提供`);
+        .setDescription(
+            `获奖者：\n${winnerIds.map((id) => mentionUser(id)).join("\n")}\n本次抽奖由${mentionUser(hostMemberId)}提供`
+        );
     return { content: `抽奖结束 ${useEmoji("883973897001762837", "paimon_lay_down")}`, embeds: [embed] };
 }
 
@@ -227,23 +261,31 @@ async function concludeGiveaway(client: Client, data: GiveawayData) {
 
     data.winnerIds = [];
     for (let i = 0; i < data.quatity; i++) {
-        if (!rafflePool.length) break
+        if (!rafflePool.length) break;
         const winnerIdx = Math.floor(Math.random() * rafflePool.length);
         data.winnerIds.push(rafflePool[winnerIdx]);
         rafflePool.splice(winnerIdx, 1);
     }
 
-
     await message.edit(getConcludeGiveawayMessage(data.prize, data.hostMemberId, data.winnerIds));
 
-    await channel.send(`恭喜 ${data.winnerIds.map(id => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(data.hostMemberId)}领取奖品：${data.prize}`);
+    await channel.send(
+        `恭喜 ${data.winnerIds.map((id) => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(
+            data.hostMemberId
+        )}领取奖品：${data.prize}`
+    );
 
-    database.excludeList.push(...data.winnerIds)
+    database.excludeList.push(...data.winnerIds);
     endGiveaway(data);
 }
 
-async function _rerollGiveaway(client: Client, messageId: string, rerollExplaination: string,
-    usersToBeReplaced: string[], usersToBeReinstated: string[]) {
+async function _rerollGiveaway(
+    client: Client,
+    messageId: string,
+    rerollExplaination: string,
+    usersToBeReplaced: string[],
+    usersToBeReinstated: string[]
+) {
     let data: GiveawayData;
     let i = database.endedGiveaways.length - 1;
     while (true) {
@@ -262,14 +304,14 @@ async function _rerollGiveaway(client: Client, messageId: string, rerollExplaina
         data.winnerIds = [];
     }
 
-    database.excludeList = database.excludeList.filter(x => !usersToBeReinstated.includes(x));
+    database.excludeList = database.excludeList.filter((x) => !usersToBeReinstated.includes(x));
 
     const channel = client.channels.cache.get(data.channelId) as TextChannel;
     const message = await channel.messages.fetch(data.messageId);
     const reactionUsers = await message.reactions.cache.get(data.reactionEmojiId)!.users.fetch();
     const rafflePool = [];
     const excludeSet = new Set(database.excludeList);
-    data.winnerIds.forEach(x => excludeSet.add(x));
+    data.winnerIds.forEach((x) => excludeSet.add(x));
 
     for (const userId of reactionUsers.keys()) {
         if (userId === config.CLIENT_ID) continue;
@@ -289,18 +331,21 @@ async function _rerollGiveaway(client: Client, messageId: string, rerollExplaina
 
     await message.edit(getConcludeGiveawayMessage(data.prize, data.hostMemberId, data.winnerIds));
 
-    await channel.send(`${rerollExplaination}\n恭喜 ${rerollWinners.map(id => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(data.hostMemberId)}领取奖品：${data.prize}`);
+    await channel.send(
+        `${rerollExplaination}\n恭喜 ${data.winnerIds.map((id) => mentionUser(id)).join(" ")} 获奖！请联系${mentionUser(
+            data.hostMemberId
+        )}领取奖品：${data.prize}`
+    );
 
     database.excludeList.push(...rerollWinners);
     writeData(command_info.name, database);
 }
 
-
 const command: Command = {
     name: command_info.name,
     handler: executeCommand,
     commandBuilder: commandBuilder,
-    onReady: onReady
-}
+    onReady: onReady,
+};
 
 export default command;

@@ -13,7 +13,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "discord-api-types": "^0.37.35",
-    "discord.js": "^14.7.1",
+    "discord.js": "^14.14.1",
     "dotenv": "^16.0.3",
     "source-map-support": "^0.5.21",
     "yaml": "^1.10.2"
